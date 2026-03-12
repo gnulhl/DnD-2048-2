@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>DnD 怪物图鉴 2048</title>
+  <style>
+    :root{
+      --bg:#0a0f18;
+      --panel:rgba(18,25,40,.92);
+      --line:rgba(236,205,140,.24);
+      --gold:#eacb88;
+      --gold2:#fff1c4;
+      --text:#f6f0e3;
+      --muted:#b7b2c7;
+      --board-size:min(92vw,620px);
+      --gap:10px;
+      --cell:calc((var(--board-size) - var(--gap) * 6) / 5);
+      --shadow:0 20px 50px rgba(0,0,0,.42);
+    }
+
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%}
+    body{
+      font-family:"Segoe UI","PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at 20% 0%, rgba(95,132,255,.16), transparent 24%),
+        radial-gradient(circle at 100% 20%, rgba(255,106,73,.15), transparent 22%),
+        radial-gradient(circle at 50% 100%, rgba(70,160,146,.14), transparent 28%),
+        linear-gradient(180deg,#090d15 0%, #101827 40%, #090d14 100%);
+      overflow-x:hidden;
+    }
+    body::before{
+      content:"";
+      position:fixed; inset:0; pointer-events:none;
+      background:
+        linear-gradient(transparent 96%, rgba(255,255,255,.012) 100%),
+        linear-gradient(90deg, transparent 96%, rgba(255,255,255,.008) 100%);
+      background-size:100% 4px,4px 100%;
+      opacity:.35;
+      mix-blend-mode:soft-light;
+    }
+
+    .app{max-width:1320px;margin:0 auto;padding:20px 16px 40px;position:relative;}
+    .hero{display:grid;grid-template-columns:1.3fr .9fr;gap:16px;margin-bottom:16px;}
+    .card{
+      background:linear-gradient(180deg, rgba(31,40,63,.9), rgba(15,21,34,.96));
+      border:1px solid var(--line);
+      border-radius:26px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      position:relative;
+      backdrop-filter:blur(8px);
+    }
+    .card::before{
+      content:"";
+      position:absolute; inset:0; pointer-events:none;
+      background:
+        radial-gradient(circle at top right, rgba(255,228,158,.08), transparent 28%),
+        linear-gradient(135deg, rgba(255,255,255,.04), transparent 40%);
+    }
+    .hero-main{padding:24px 24px 20px}
+    .title{
+      margin:0;
+      font-size:clamp(28px,4vw,46px);
+      line-height:1.05;
+      letter-spacing:.02em;
+      display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    }
+    .title .sigil{color:var(--gold);text-shadow:0 0 16px rgba(255,211,110,.42);font-size:.9em;}
+    .subtitle{margin:14px 0 0;color:var(--muted);line-height:1.7;font-size:14.5px;max-width:72ch;}
+    .tags{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;}
+    .tag{padding:8px 12px;border-radius:999px;font-size:12px;letter-spacing:.05em;color:#e8e4f3;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);}
+
+    .hero-side{padding:16px;display:grid;grid-template-columns:repeat(2,1fr);gap:12px;align-content:center;}
+    .metric{border-radius:20px;padding:16px;min-height:108px;background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;justify-content:space-between;}
+    .metric .label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.11em;}
+    .metric .value{font-size:clamp(22px,3vw,34px);font-weight:800;color:var(--gold2);line-height:1;text-shadow:0 0 18px rgba(255,231,169,.18);word-break:break-all;}
+    .metric .sub{font-size:12px;color:#d6d2e1;opacity:.88;}
+
+    .layout{display:grid;grid-template-columns:minmax(0,1.04fr) minmax(320px,.76fr);gap:16px;align-items:start;}
+    .panel{padding:18px;}
+    .section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;}
+    .section-head h2{margin:0;font-size:22px;letter-spacing:.02em;}
+    .section-head p{margin:0;color:var(--muted);font-size:13px;}
+    .controls{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
+
+    button{
+      appearance:none;border:none;cursor:pointer;color:var(--text);border-radius:14px;padding:12px 16px;font-size:14px;font-weight:700;letter-spacing:.02em;
+      background:linear-gradient(180deg,#3c4e77,#293858);border:1px solid rgba(255,255,255,.10);
+      box-shadow:0 10px 18px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.10);
+      transition:transform .14s ease, filter .14s ease, box-shadow .14s ease;
+    }
+    button:hover{transform:translateY(-1px);filter:brightness(1.06)}
+    button:active{transform:translateY(1px)}
+    button.secondary{background:linear-gradient(180deg,#5d4b32,#40311f)}
+    button.warn{background:linear-gradient(180deg,#79423e,#542a28)}
+    button.ghost{background:linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04))}
+
+    .hint{font-size:13px;color:var(--muted);line-height:1.65;margin-bottom:14px;}
+
+    .board-frame{
+      width:var(--board-size);
+      margin:0 auto;
+      padding:var(--gap);
+      border-radius:28px;
+      position:relative;
+      background:linear-gradient(180deg, rgba(84,64,40,.92), rgba(49,38,24,.98));
+      border:1px solid rgba(255,228,177,.18);
+      box-shadow:inset 0 2px 0 rgba(255,255,255,.08), 0 18px 40px rgba(0,0,0,.35);
+    }
+    .board-frame::before{content:"";position:absolute;inset:8px;border-radius:22px;border:1px solid rgba(255,239,206,.10);pointer-events:none;}
+    .board{width:calc(var(--cell) * 5 + var(--gap) * 4);height:calc(var(--cell) * 5 + var(--gap) * 4);position:relative;margin:var(--gap);touch-action:none;user-select:none;overflow:visible;}
+    .grid{position:absolute;inset:0;display:grid;grid-template-columns:repeat(5, 1fr);grid-template-rows:repeat(5, 1fr);gap:var(--gap);}
+    .bg-cell{border-radius:18px;background:linear-gradient(180deg, rgba(17,22,35,.84), rgba(10,13,22,.94));border:1px solid rgba(255,255,255,.04);box-shadow:inset 0 1px 0 rgba(255,255,255,.03);}
+    .tile-layer,.particle-layer{position:absolute;inset:0;pointer-events:none;}
+
+    .tile{
+      position:absolute;width:var(--cell);height:var(--cell);border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.10);
+      box-shadow:0 12px 18px rgba(0,0,0,.26), inset 0 1px 0 rgba(255,255,255,.10);
+      display:flex;flex-direction:column;justify-content:space-between;padding:5px;isolation:isolate;
+      transition:transform 190ms cubic-bezier(.2,.8,.2,1), opacity 170ms ease, filter 190ms ease;
+      will-change:transform, opacity;
+    }
+    .tile::before{
+      content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+      background:
+        radial-gradient(circle at 50% 18%, rgba(255,255,255,.16), transparent 34%),
+        linear-gradient(180deg, rgba(255,255,255,.035), transparent 42%),
+        linear-gradient(135deg, rgba(255,255,255,.02), transparent 46%);
+    }
+    .tile::after{
+      content:"";position:absolute;inset:-18%;z-index:0;pointer-events:none;
+      background:conic-gradient(from 0deg, transparent, rgba(255,255,255,.05), transparent 35%, rgba(255,255,255,.025), transparent 70%);
+      animation:spin 10s linear infinite;opacity:.12;
+    }
+    .tile-crest,.tile-corners,.tile-aura{
+      position:absolute;pointer-events:none;z-index:0;
+    }
+    .tile-crest{
+      inset:auto 16% 10px 16%;height:14px;border-radius:999px;
+      opacity:.18;
+      background:linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+      filter:blur(.4px);
+    }
+    .tile-corners{
+      inset:5px;border-radius:14px;opacity:0;
+      background:
+        linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,0)) top left/16px 1px no-repeat,
+        linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0)) top left/1px 16px no-repeat,
+        linear-gradient(270deg, rgba(255,255,255,.18), rgba(255,255,255,0)) top right/16px 1px no-repeat,
+        linear-gradient(180deg, rgba(255,255,255,.18), rgba(255,255,255,0)) top right/1px 16px no-repeat,
+        linear-gradient(90deg, rgba(255,255,255,.18), rgba(255,255,255,0)) bottom left/16px 1px no-repeat,
+        linear-gradient(0deg, rgba(255,255,255,.18), rgba(255,255,255,0)) bottom left/1px 16px no-repeat,
+        linear-gradient(270deg, rgba(255,255,255,.18), rgba(255,255,255,0)) bottom right/16px 1px no-repeat,
+        linear-gradient(0deg, rgba(255,255,255,.18), rgba(255,255,255,0)) bottom right/1px 16px no-repeat;
+    }
+    .tile-aura{
+      inset:-10%;border-radius:22px;opacity:0;
+      filter:blur(10px);
+    }
+    .rune{position:absolute;inset:6px;border-radius:14px;pointer-events:none;z-index:0;opacity:0;}
+
+    .tier-1{
+      background:
+        linear-gradient(180deg,#675236,#453322),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.018) 0 3px, transparent 3px 7px);
+      border-color:rgba(244,214,159,.10);
+      box-shadow:0 10px 16px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.07);
+    }
+    .tier-1::after{opacity:.06;animation-duration:16s;}
+    .tier-1 .tile-name,.tier-1 .tile-value{color:#f3e2bf;}
+    .tier-1 .tile-crest{opacity:.10;background:linear-gradient(90deg, transparent, rgba(233,198,128,.18), transparent);}
+
+    .tier-2{
+      background:
+        linear-gradient(180deg,#495f83,#2d3f5c),
+        radial-gradient(circle at 50% -10%, rgba(161,212,255,.14), transparent 42%);
+      border-color:rgba(184,223,255,.18);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.04),
+        0 0 18px rgba(112,162,255,.10),
+        0 12px 18px rgba(0,0,0,.28),
+        inset 0 1px 0 rgba(255,255,255,.11);
+    }
+    .tier-2::after{opacity:.16;animation-duration:11s;}
+    .tier-2 .rune{
+      opacity:.22;
+      background:
+        radial-gradient(circle at 50% 48%, rgba(173,223,255,.10), transparent 54%),
+        repeating-linear-gradient(45deg, rgba(206,234,255,.055) 0 2px, transparent 2px 7px);
+      animation:rune 4.2s ease-in-out infinite;
+    }
+    .tier-2 .tile-corners{opacity:.38;}
+    .tier-2 .tile-crest{opacity:.22;}
+    .tier-2 .tile-name,.tier-2 .tile-value{text-shadow:0 0 10px rgba(180,225,255,.10), 0 1px 0 rgba(0,0,0,.45);}
+
+    .tier-3{
+      background:
+        linear-gradient(180deg,#563f85,#32224f),
+        radial-gradient(circle at 50% -8%, rgba(206,165,255,.16), transparent 38%),
+        radial-gradient(circle at 50% 120%, rgba(255,128,86,.10), transparent 34%);
+      border-color:rgba(222,173,255,.22);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.05),
+        0 0 24px rgba(150,95,255,.16),
+        0 16px 22px rgba(0,0,0,.30),
+        inset 0 1px 0 rgba(255,255,255,.12);
+      animation:pulse 3.4s ease-in-out infinite;
+    }
+    .tier-3::after{opacity:.22;animation-duration:8.5s;}
+    .tier-3 .rune{
+      opacity:.34;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(228,178,255,.10), transparent 52%),
+        repeating-linear-gradient(45deg, rgba(255,226,197,.08) 0 2px, transparent 2px 7px),
+        repeating-linear-gradient(-45deg, rgba(157,118,255,.06) 0 2px, transparent 2px 8px);
+      animation:rune 3.1s ease-in-out infinite;
+    }
+    .tier-3 .tile-corners{opacity:.58;}
+    .tier-3 .tile-crest{opacity:.34;background:linear-gradient(90deg, transparent, rgba(255,211,132,.40), transparent);}
+    .tier-3 .tile-aura{
+      opacity:.36;
+      background:radial-gradient(circle, rgba(163,110,255,.16), transparent 62%);
+    }
+    .tier-3 .tile-name,.tier-3 .tile-value{
+      color:#fff0cd;
+      text-shadow:0 0 14px rgba(255,206,138,.18), 0 1px 0 rgba(0,0,0,.5);
+    }
+
+    .tier-4{
+      background:
+        linear-gradient(180deg,#77382a,#4f1d1a),
+        radial-gradient(circle at 50% -12%, rgba(255,215,120,.18), transparent 34%),
+        radial-gradient(circle at 50% 120%, rgba(255,96,64,.14), transparent 36%);
+      border-color:rgba(255,215,146,.30);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,.07),
+        0 0 30px rgba(255,118,72,.22),
+        0 0 56px rgba(255,188,74,.12),
+        0 18px 24px rgba(0,0,0,.34),
+        inset 0 1px 0 rgba(255,255,255,.14);
+      animation:pulse 2.8s ease-in-out infinite, glow 2.8s ease-in-out infinite;
+    }
+    .tier-4::after{opacity:.30;animation-duration:6.8s;}
+    .tier-4 .rune{
+      opacity:.46;
+      background:
+        radial-gradient(circle at 50% 50%, rgba(255,165,115,.12), transparent 50%),
+        repeating-linear-gradient(45deg, rgba(255,240,200,.10) 0 2px, transparent 2px 8px),
+        repeating-linear-gradient(-45deg, rgba(255,140,88,.08) 0 2px, transparent 2px 10px);
+      animation:rune 2.6s ease-in-out infinite;
+    }
+    .tier-4 .tile-corners{opacity:.78;}
+    .tier-4 .tile-crest{opacity:.48;background:linear-gradient(90deg, transparent, rgba(255,228,145,.52), transparent);}
+    .tier-4 .tile-aura{
+      opacity:.48;
+      background:radial-gradient(circle, rgba(255,128,82,.22), transparent 62%);
+    }
+    .tier-4 .tile-name,.tier-4 .tile-value{
+      color:#fff5d8;
+      text-shadow:0 0 18px rgba(255,224,152,.24), 0 1px 0 rgba(0,0,0,.55);
+    }
+
+    .legend-box{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+    .legend{border-radius:16px;padding:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);color:#ded8ea;font-size:13px;line-height:1.55;}
+    .legend strong{color:var(--gold2)}
+    .side-grid{display:grid;gap:14px;}
+
+    .profile-card{display:grid;grid-template-columns:118px 1fr;gap:14px;padding:14px;border-radius:20px;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08);align-items:center;}
+    .profile-art{width:118px;height:118px;border-radius:18px;background:linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);display:grid;place-items:center;position:relative;overflow:hidden;}
+    .profile-art::after{content:"";position:absolute;inset:auto auto -20px -10px;width:130px;height:70px;background:radial-gradient(circle, rgba(255,226,172,.15), transparent 68%);filter:blur(6px);}
+    .profile-canvas{width:104px;height:104px;image-rendering:pixelated;image-rendering:crisp-edges;position:relative;z-index:1;filter:drop-shadow(0 8px 10px rgba(0,0,0,.28));}
+    .profile-title{font-size:12px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;}
+    .profile-name{font-size:24px;line-height:1.1;color:var(--gold2);font-weight:800;margin-top:4px;}
+    .profile-sub{font-size:13px;color:#e8e3ef;margin-top:8px;line-height:1.6;}
+
+    .bestiary{margin-top:16px;padding:18px;}
+    .bestiary-head{display:flex;justify-content:space-between;align-items:end;gap:12px;margin-bottom:14px;}
+    .bestiary-head h2{margin:0;font-size:24px}
+    .bestiary-head p{margin:0;color:var(--muted);font-size:13px}
+    .book-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(190px, 1fr));gap:14px;}
+    .entry{position:relative;border-radius:20px;overflow:hidden;background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.08);box-shadow:0 12px 20px rgba(0,0,0,.16);display:flex;flex-direction:column;min-height:264px;}
+    .entry::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at top right, rgba(255,239,195,.08), transparent 28%), linear-gradient(180deg, rgba(255,255,255,.04), transparent 32%);}
+    .entry-art{min-height:126px;padding:12px 12px 6px;display:flex;justify-content:center;align-items:center;position:relative;}
+    .entry-art::after{content:"";position:absolute;width:86px;height:86px;border-radius:50%;background:radial-gradient(circle, rgba(255,234,187,.08), transparent 68%);filter:blur(4px);}
+    .entry-canvas{width:116px;height:116px;image-rendering:pixelated;image-rendering:crisp-edges;position:relative;z-index:1;filter:drop-shadow(0 8px 10px rgba(0,0,0,.28));}
+    .entry-body{padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;flex:1;}
+    .entry-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+    .entry-id{font-size:11px;letter-spacing:.12em;color:#cbc6d6;text-transform:uppercase;}
+    .entry-tier{font-size:11px;padding:4px 8px;border-radius:999px;background:rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.08);color:#fff1c6;font-weight:700;}
+    .entry-name{margin:0;font-size:20px;line-height:1.15;color:var(--gold2);}
+    .entry-value{font-size:13px;color:#e9e3f3;font-weight:700;}
+    .entry-desc{margin:0;font-size:13px;color:#ddd7e8;line-height:1.6;flex:1;}
+    .entry.locked{filter:saturate(.65);}
+    .entry.locked .entry-name{color:#d6d0df;}
+    .entry.locked .entry-canvas{filter:grayscale(1) contrast(1.05) brightness(.48) blur(.2px) drop-shadow(0 8px 10px rgba(0,0,0,.33));opacity:.95;}
+    .entry.locked .entry-art::before{content:"?";position:absolute;z-index:2;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:24px;font-weight:900;background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.10);color:#fff2c1;box-shadow:0 8px 16px rgba(0,0,0,.25);}
+
+    .overlay{position:fixed;inset:0;background:rgba(4,7,13,.74);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:18px;z-index:50;}
+    .overlay.show{display:flex}
+    .overlay-card{width:min(560px, 100%);padding:24px;text-align:center;background:linear-gradient(180deg, rgba(32,42,65,.94), rgba(16,22,36,.98));border:1px solid var(--line);border-radius:28px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+    .overlay-card::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 50% 0%, rgba(255,229,161,.12), transparent 30%), linear-gradient(135deg, rgba(255,255,255,.04), transparent 36%);}
+    .overlay h3{margin:0 0 12px;font-size:32px;color:var(--gold2);}
+    .overlay p{margin:0 auto 18px;color:#e2dcec;line-height:1.7;max-width:42ch;}
+    .overlay-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;}
+
+    @media (max-width: 1000px){.hero{grid-template-columns:1fr}.layout{grid-template-columns:1fr}}
+    @media (max-width: 640px){
+      .app{padding:14px 10px 28px}.hero-main{padding:18px}.panel{padding:14px}.hero-side{grid-template-columns:repeat(2,1fr); padding:12px}.metric{min-height:92px; padding:12px}
+      .book-grid{grid-template-columns:repeat(2, minmax(0, 1fr))}.entry{min-height:236px}.entry-name{font-size:17px}.controls button{flex:1 1 calc(50% - 8px)}
+      .profile-card{grid-template-columns:92px 1fr}.profile-art{width:92px;height:92px}.profile-canvas{width:82px;height:82px}
+    }
+    @media (max-width: 420px){.tile-name{font-size:9px}.tile-value{font-size:11px}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="hero">
+      <div class="card hero-main">
+        <h1 class="title"><span class="sigil">✦</span> DnD 怪物图鉴 2048</h1>
+        <p class="subtitle">
+          在幽暗地牢的石板上推动奥术方块，让低阶魔物不断融合进化，逐步补全下方的冒险者图鉴。
+          这版把方块内怪物立绘重新加大，并重做了一整套更饱满的像素稿，让轮廓、装备、鳞片、骨骼、触须与材质差异更明显。
+        </p>
+        <div class="tags">
+          <span class="tag">5×5 棋盘</span>
+          <span class="tag">方向键 / 滑动</span>
+          <span class="tag">无限次回退</span>
+          <span class="tag">平滑移动动画</span>
+          <span class="tag">重做立绘占比与细节</span>
+        </div>
+      </div>
+      <div class="card hero-side">
+        <div class="metric">
+          <div class="label">当前分数</div>
+          <div class="value" id="score">0</div>
+          <div class="sub">每次合成都会增加分数</div>
+        </div>
+        <div class="metric">
+          <div class="label">最高分数</div>
+          <div class="value" id="bestScore">0</div>
+          <div class="sub">自动保存在本地浏览器</div>
+        </div>
+        <div class="metric">
+          <div class="label">当前最高</div>
+          <div class="value" id="highestName">洞穴鼠</div>
+          <div class="sub" id="highestValue">2</div>
+        </div>
+        <div class="metric">
+          <div class="label">已解锁图鉴</div>
+          <div class="value" id="unlockCount">0 / 21</div>
+          <div class="sub">首次合成出的存在将被记录</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="layout">
+      <div class="card panel">
+        <div class="section-head">
+          <div>
+            <h2>奥术棋盘</h2>
+            <p>推动方块，让相同怪物沿同一方向融合。</p>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="newGameBtn">重新开局</button>
+          <button id="undoBtn" class="secondary">回退一步（Z）</button>
+          <button id="clearSaveBtn" class="warn">重置本地记录</button>
+        </div>
+
+        <div class="hint">
+          操作方式：键盘方向键 / WASD；手机上可直接在棋盘区域滑动。<br>
+          已移除目标提示区，避免 UI 预先暴露后续怪物阶位。
+        </div>
+
+        <div class="board-frame" id="boardFrame">
+          <div class="board" id="board">
+            <div class="grid" id="bgGrid"></div>
+            <div class="tile-layer" id="tileLayer"></div>
+            <canvas class="particle-layer" id="particleCanvas"></canvas>
+          </div>
+        </div>
+
+        <div class="legend-box">
+          <div class="legend">
+            <strong>合成规则：</strong>与经典 2048 一致，同一移动中每个方块最多合成一次。
+          </div>
+          <div class="legend">
+            <strong>视觉分层：</strong>越高阶的怪物会拥有更强的光晕、符文边框与爆散粒子。
+          </div>
+        </div>
+      </div>
+
+      <div class="card panel">
+        <div class="section-head">
+          <div>
+            <h2>冒险记录</h2>
+            <p>只显示你已经抵达过的内容，不主动剧透后续目标。</p>
+          </div>
+        </div>
+
+        <div class="side-grid">
+          <div class="profile-card">
+            <div class="profile-art">
+              <canvas id="profileCanvas" class="profile-canvas" width="144" height="144"></canvas>
+            </div>
+            <div>
+              <div class="profile-title">当前最强个体</div>
+              <div class="profile-name" id="profileName">洞穴鼠</div>
+              <div class="profile-sub" id="profileDesc">在潮湿石缝间穿行的灰毛掠食者，成群时连火把都敢试探。</div>
+            </div>
+          </div>
+
+          <div class="legend">
+            <strong>操作提示：</strong><br>
+            Z 可无限回退。每当合成发生，棋盘会在合成点释放对应属性的粒子爆散与脉冲光环。
+          </div>
+
+          <div class="legend">
+            <strong>图鉴规则：</strong><br>
+            已解锁条目会显示名称、像素立绘与简短世界观描述；未解锁只显示“未知魔物”与模糊档案语句。
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card bestiary">
+      <div class="bestiary-head">
+        <div>
+          <h2>冒险者怪物图鉴</h2>
+          <p>每个数字都对应一个 DnD 风格怪物。首次合成后解锁词条。</p>
+        </div>
+        <div style="color:var(--muted);font-size:13px">未解锁条目不会提前显示正式名称与完整介绍</div>
+      </div>
+      <div class="book-grid" id="bestiaryGrid"></div>
+    </section>
+  </div>
+
+  <div class="overlay" id="overlay">
+    <div class="overlay-card">
+      <h3 id="overlayTitle">冒险结束</h3>
+      <p id="overlayText">地牢的石板已经被填满，但你的图鉴仍会记住每一次伟大的进化。</p>
+      <div class="overlay-actions">
+        <button id="continueBtn" class="ghost">继续观看棋盘</button>
+        <button id="restartBtn">重新开局</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SIZE = 5;
+    const GAP = 10;
+    const STORAGE_KEY = "dnd2048_save_v3";
+    const MOVE_DURATION = 190;
+    let nextTileId = 1;
+    let state = null;
+    let history = [];
+    let boardLocked = false;
+    let boardWon = false;
+    let animating = false;
+    const tileElements = new Map();
+    const particles = [];
+    let particleRAF = 0;
+
+    const MONSTERS = [
+      { value: 2, key: "rat", name: "洞穴鼠", tier: "地牢凡种", blurb: "在潮湿石缝间穿行的灰毛掠食者，成群时连火把都敢试探。" },
+      { value: 4, key: "kobold", name: "狗头人", tier: "地牢凡种", blurb: "狡黠、卑伏，却总爱在黑暗的拐角为入侵者埋下最烦人的陷阱。" },
+      { value: 8, key: "goblin", name: "哥布林", tier: "地牢凡种", blurb: "绿皮小祸害，擅长用喧闹与数量把局面搅成一锅难堪的泥浆。" },
+      { value: 16, key: "icebat", name: "冰魔蝠", tier: "阴寒异种", blurb: "它振翼时会抖落霜粉，像一阵会咬人的冬夜风。" },
+      { value: 32, key: "ghoul", name: "食尸鬼", tier: "阴寒异种", blurb: "蜷缩在墓穴尽头的饥饿阴影，指甲里总留着不该存在的黑泥。" },
+      { value: 64, key: "ogre", name: "食人魔", tier: "蛮力魔种", blurb: "迟钝而恐怖，像会行走的攻城锤，笑声比脚步更令人不安。" },
+      { value: 128, key: "displacer", name: "移位兽", tier: "蛮力魔种", blurb: "它真正的位置总比你眼睛看见的地方偏上半步。那半步，往往致命。" },
+      { value: 256, key: "flameskull", name: "燃焰之颅", tier: "奥术异怪", blurb: "失去肉身后仍执着漂浮的头骨，以永不熄灭的恶火宣告主人的遗志。" },
+      { value: 512, key: "elemental", name: "火元素", tier: "奥术异怪", blurb: "纯粹的焚烧意志，既无骨也无血，却比铠甲与獠牙更适合战争。" },
+      { value: 1024, key: "medusa", name: "美杜莎", tier: "诅咒魔裔", blurb: "她的凝视让时间本身都发出石化般的脆响。" },
+      { value: 2048, key: "mindflayer", name: "夺心魔", tier: "诅咒魔裔", blurb: "自深海与噩梦中攫取智慧的猎手，把思想当作最丰腴的猎物。" },
+      { value: 4096, key: "hydra", name: "多头蛇", tier: "传奇灾厄", blurb: "每一颗头都像一场独立的伏击，而整具身体是一场会增长的灾难。" },
+      { value: 8192, key: "cloudgiant", name: "云巨人", tier: "传奇灾厄", blurb: "高居天穹的古老贵胄，连俯视都带着暴风将至的威压。" },
+      { value: 16384, key: "aboleth", name: "底栖魔鱼", tier: "深渊主宰", blurb: "比王朝更古老的湿冷记忆在它体内流动，世界曾在它眼前重复沉浮。" },
+      { value: 32768, key: "basilisk", name: "青足龙蛇", tier: "深渊主宰", blurb: "覆鳞的古怪猎手，以扭曲视线与剧毒步伐宣告领地归属。" },
+      { value: 65536, key: "vampire", name: "吸血鬼", tier: "夜王贵胄", blurb: "在烛焰与丝绒之间露出獠牙的贵族，优雅得像一封写给死亡的请柬。" },
+      { value: 131072, key: "beholder", name: "眼魔", tier: "夜王贵胄", blurb: "漂浮在空中的暴君之眼，每一束目光都像一条不同的法则。" },
+      { value: 262144, key: "silverdragon", name: "银龙", tier: "古龙圣裔", blurb: "霜辉般的龙鳞映照群山，它的俯冲足以让战争忘记自己的名字。" },
+      { value: 524288, key: "lich", name: "巫妖", tier: "古龙圣裔", blurb: "把死亡驯化为学术，把灵魂封存为工具的禁忌大法师。" },
+      { value: 1048576, key: "tarrasque", name: "泰拉斯奎", tier: "终焉灾兽", blurb: "诸城邦传说中的噩梦实体，像把世界折成裂缝般碾压前进。" },
+      { value: 2097152, key: "tiamat", name: "提亚马特", tier: "神话终局", blurb: "五首龙后的威名跨越地狱与凡界，每一颗头都咆哮着一种灭绝。" }
+    ];
+    const MONSTER_MAP = Object.fromEntries(MONSTERS.map(m => [m.value, m]));
+
+    const bgGrid = document.getElementById("bgGrid");
+    const tileLayer = document.getElementById("tileLayer");
+    const bestiaryGrid = document.getElementById("bestiaryGrid");
+    const boardEl = document.getElementById("board");
+    const particleCanvas = document.getElementById("particleCanvas");
+    const pctx = particleCanvas.getContext("2d");
+
+    const scoreEl = document.getElementById("score");
+    const bestScoreEl = document.getElementById("bestScore");
+    const highestNameEl = document.getElementById("highestName");
+    const highestValueEl = document.getElementById("highestValue");
+    const unlockCountEl = document.getElementById("unlockCount");
+    const profileCanvas = document.getElementById("profileCanvas");
+    const profileNameEl = document.getElementById("profileName");
+    const profileDescEl = document.getElementById("profileDesc");
+    const overlayEl = document.getElementById("overlay");
+    const overlayTitleEl = document.getElementById("overlayTitle");
+    const overlayTextEl = document.getElementById("overlayText");
+
+    function emptyIdGrid(){ return Array.from({ length: SIZE }, () => Array(SIZE).fill(null)); }
+    function emptyValueBoard(){ return Array.from({ length: SIZE }, () => Array(SIZE).fill(0)); }
+
+    function loadPersist(){
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return { bestScore: 0, unlocked: [2] };
+        const data = JSON.parse(raw);
+        return {
+          bestScore: Number(data.bestScore) || 0,
+          unlocked: Array.isArray(data.unlocked) ? data.unlocked.filter(v => MONSTER_MAP[v]) : [2]
+        };
+      } catch {
+        return { bestScore: 0, unlocked: [2] };
+      }
+    }
+
+    function savePersist(){
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ bestScore: state.bestScore, unlocked: [...state.unlocked] }));
+    }
+    function clearPersist(){ localStorage.removeItem(STORAGE_KEY); }
+
+    function buildStateFromBoard(boardValues, score, bestScore, unlockedList){
+      const grid = emptyIdGrid();
+      const tiles = new Map();
+      for (let r = 0; r < SIZE; r++) {
+        for (let c = 0; c < SIZE; c++) {
+          const value = boardValues[r][c];
+          if (!value) continue;
+          const id = nextTileId++;
+          const tile = { id, value, row:r, col:c, prevRow:r, prevCol:c, isNew:false, remove:false, bump:false, mergedInto:null };
+          grid[r][c] = id;
+          tiles.set(id, tile);
+        }
+      }
+      const s = { grid, tiles, score:score||0, bestScore:bestScore||0, highest:2, unlocked:new Set(unlockedList||[2]) };
+      unlockSeenBasics(s); updateHighest(s); return s;
+    }
+
+    function createFreshState(){
+      const saved = loadPersist();
+      const board = emptyValueBoard();
+      addRandomValue(board); addRandomValue(board);
+      return buildStateFromBoard(board, 0, saved.bestScore || 0, saved.unlocked || [2]);
+    }
+
+    function addRandomValue(boardValues){
+      const empties = [];
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) if (boardValues[r][c]===0) empties.push([r,c]);
+      if (!empties.length) return false;
+      const [r,c] = empties[Math.floor(Math.random()*empties.length)];
+      boardValues[r][c] = Math.random() < 0.9 ? 2 : 4;
+      return true;
+    }
+
+    function addRandomTileObject(s){
+      const empties = [];
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) if (s.grid[r][c]==null) empties.push([r,c]);
+      if (!empties.length) return false;
+      const [r,c] = empties[Math.floor(Math.random()*empties.length)];
+      const value = Math.random() < 0.9 ? 2 : 4;
+      const id = nextTileId++;
+      s.grid[r][c] = id;
+      s.tiles.set(id, { id, value, row:r, col:c, prevRow:r, prevCol:c, isNew:true, remove:false, bump:false, mergedInto:null });
+      s.unlocked.add(value);
+      return true;
+    }
+
+    function boardValuesFromState(s){
+      const board = emptyValueBoard();
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) {
+        const id = s.grid[r][c];
+        if (id != null && s.tiles.has(id)) board[r][c] = s.tiles.get(id).value;
+      }
+      return board;
+    }
+
+    function serializeState(s){
+      return { board: boardValuesFromState(s), score:s.score, bestScore:s.bestScore, highest:s.highest, unlocked:[...s.unlocked] };
+    }
+
+    function restoreFromSerialized(serialized){
+      state = buildStateFromBoard(serialized.board, serialized.score, Math.max(loadPersist().bestScore || 0, serialized.bestScore || 0), serialized.unlocked || [2]);
+      state.highest = serialized.highest || state.highest;
+      boardLocked = false;
+      boardWon = state.highest >= 2097152;
+      clearTileDOM();
+      renderAll(true);
+      savePersist();
+    }
+
+    function clearTileDOM(){ tileLayer.innerHTML = ""; tileElements.clear(); }
+    function unlockSeenBasics(s){ for (const [,tile] of s.tiles) if (tile.value===2 || tile.value===4) s.unlocked.add(tile.value); }
+    function updateHighest(s){ let max = 2; for (const [,tile] of s.tiles) if (tile.value > max) max = tile.value; s.highest = Math.max(s.highest, max); }
+    function getMonsterByValue(v){ return MONSTER_MAP[v] || MONSTERS[0]; }
+    function getTierClass(value){
+      if (value < 128) return "tier-1";
+      if (value < 4096) return "tier-2";
+      if (value < 262144) return "tier-3";
+      return "tier-4";
+    }
+
+    function positionFor(row, col){
+      const cell = (boardEl.clientWidth - GAP * 4) / 5;
+      return { x: col * (cell + GAP), y: row * (cell + GAP) };
+    }
+
+    function resizeParticleCanvas(){ particleCanvas.width = boardEl.clientWidth; particleCanvas.height = boardEl.clientHeight; }
+    function renderBackgroundGrid(){
+      bgGrid.innerHTML = "";
+      for (let i=0;i<SIZE*SIZE;i++) {
+        const cell = document.createElement("div");
+        cell.className = "bg-cell";
+        bgGrid.appendChild(cell);
+      }
+      resizeParticleCanvas();
+    }
+
+    function updateTileElementContent(el, tile){
+      const monster = getMonsterByValue(tile.value);
+      el.className = `tile ${getTierClass(tile.value)}${tile.isNew ? " spawn" : ""}${tile.bump ? " bump" : ""}${tile.remove ? " remove" : ""}`;
+      el.innerHTML = `
+        <div class="tile-top"><div class="tile-name">${monster.name}</div></div>
+        <div class="sprite-wrap"><canvas class="sprite" width="184" height="184"></canvas></div>
+        <div class="tile-aura"></div>
+        <div class="tile-corners"></div>
+        <div class="tile-crest"></div>
+        <div class="rune"></div>
+        <div class="tile-value">${tile.value.toLocaleString("zh-CN")}</div>
+      `;
+      const canvas = el.querySelector("canvas");
+      drawMonster(canvas, monster.key, false);
+    }
+
+    function ensureTileElement(tile){
+      let el = tileElements.get(tile.id);
+      if (!el) {
+        el = document.createElement("div");
+        el.dataset.id = tile.id;
+        tileLayer.appendChild(el);
+        tileElements.set(tile.id, el);
+      }
+      updateTileElementContent(el, tile);
+      return el;
+    }
+
+    function applyTilePosition(el, row, col){
+      const pos = positionFor(row, col);
+      el.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+    }
+
+    function renderTiles(immediate=false){
+      const existingIds = new Set(tileElements.keys());
+      for (const [,tile] of state.tiles) {
+        const el = ensureTileElement(tile);
+        el.style.transition = immediate ? "none" : "transform 190ms cubic-bezier(.2,.8,.2,1), opacity 170ms ease, filter 190ms ease";
+        if (immediate) {
+          applyTilePosition(el, tile.row, tile.col);
+        } else {
+          requestAnimationFrame(() => applyTilePosition(el, tile.row, tile.col));
+        }
+        existingIds.delete(tile.id);
+      }
+      for (const staleId of existingIds) {
+        const stale = tileElements.get(staleId);
+        if (stale) stale.remove();
+        tileElements.delete(staleId);
+      }
+      if (immediate) requestAnimationFrame(() => { for (const el of tileElements.values()) el.style.transition = "transform 190ms cubic-bezier(.2,.8,.2,1), opacity 170ms ease, filter 190ms ease"; });
+    }
+
+    function cleanupRemovedTiles(){
+      for (const [id,tile] of [...state.tiles]) {
+        tile.isNew = false;
+        if (tile.remove) {
+          const el = tileElements.get(id);
+          if (el) el.remove();
+          tileElements.delete(id);
+          state.tiles.delete(id);
+        } else {
+          tile.bump = false;
+          tile.mergedInto = null;
+        }
+      }
+      renderTiles(true);
+    }
+
+    function updateStats(){
+      scoreEl.textContent = state.score.toLocaleString("zh-CN");
+      bestScoreEl.textContent = state.bestScore.toLocaleString("zh-CN");
+      const highestMonster = getMonsterByValue(state.highest);
+      highestNameEl.textContent = highestMonster.name;
+      highestValueEl.textContent = state.highest.toLocaleString("zh-CN");
+      unlockCountEl.textContent = `${state.unlocked.size} / ${MONSTERS.length}`;
+      profileNameEl.textContent = highestMonster.name;
+      profileDescEl.textContent = highestMonster.blurb;
+      drawMonster(profileCanvas, highestMonster.key, false);
+    }
+
+    function renderBestiary(){
+      bestiaryGrid.innerHTML = "";
+      MONSTERS.forEach((m, index) => {
+        const unlocked = state.unlocked.has(m.value);
+        const card = document.createElement("article");
+        card.className = `entry ${unlocked ? "" : "locked"}`;
+        const tierText = unlocked ? m.tier : "未鉴定";
+        const nameText = unlocked ? m.name : "未知魔物";
+        const valueText = unlocked ? m.value.toLocaleString("zh-CN") : "？？？";
+        const descText = unlocked ? m.blurb : vagueLore(index);
+        card.innerHTML = `
+          <div class="entry-art"></div>
+          <div class="entry-body">
+            <div class="entry-top">
+              <div class="entry-id">档案 #${String(index + 1).padStart(2, "0")}</div>
+              <div class="entry-tier">${tierText}</div>
+            </div>
+            <h3 class="entry-name">${nameText}</h3>
+            <div class="entry-value">${valueText}</div>
+            <p class="entry-desc">${descText}</p>
+          </div>
+        `;
+        const art = card.querySelector(".entry-art");
+        const canvas = document.createElement("canvas");
+        canvas.className = "entry-canvas";
+        canvas.width = 168;
+        canvas.height = 168;
+        drawMonster(canvas, m.key, !unlocked);
+        art.appendChild(canvas);
+        bestiaryGrid.appendChild(card);
+      });
+    }
+
+    function vagueLore(index){
+      const pool = [
+        "尚未记录的古老存在。档案纸页边缘有被灼烧与擦除的痕迹。",
+        "未知魔物。只留下难以辨认的剪影与一行模糊的警示。",
+        "未发现个体。冒险者公会建议在更深层地牢继续搜寻。",
+        "档案残缺。似乎有目击者提到“它并不止看起来那样简单”。",
+        "尘封页签之后，仍有一段名字被刻意刮去的空白。",
+        "尚未确认形态。关于它的描述只剩“危险，且不该被提前知晓”。"
+      ];
+      return pool[index % pool.length];
+    }
+
+    function renderAll(immediate=false){ renderTiles(immediate); updateStats(); renderBestiary(); }
+
+    function lineIdsFor(dir, index){
+      const ids = [];
+      if (dir === "left") for (let c=0;c<SIZE;c++) ids.push(state.grid[index][c]);
+      else if (dir === "right") for (let c=SIZE-1;c>=0;c--) ids.push(state.grid[index][c]);
+      else if (dir === "up") for (let r=0;r<SIZE;r++) ids.push(state.grid[r][index]);
+      else for (let r=SIZE-1;r>=0;r--) ids.push(state.grid[r][index]);
+      return ids.filter(id => id != null);
+    }
+
+    function targetCoordFor(dir, lineIndex, targetIndex){
+      if (dir === "left") return [lineIndex, targetIndex];
+      if (dir === "right") return [lineIndex, SIZE - 1 - targetIndex];
+      if (dir === "up") return [targetIndex, lineIndex];
+      return [SIZE - 1 - targetIndex, lineIndex];
+    }
+
+    function move(dir){
+      if (boardLocked || animating) return;
+      const snapshot = serializeState(state);
+      let changed = false;
+      let gained = 0;
+      const mergedEvents = [];
+
+      for (const [,tile] of state.tiles) {
+        tile.prevRow = tile.row; tile.prevCol = tile.col; tile.isNew = false; tile.remove = false; tile.bump = false; tile.mergedInto = null;
+      }
+
+      const newGrid = emptyIdGrid();
+      for (let line=0; line<SIZE; line++) {
+        const ids = lineIdsFor(dir, line);
+        let target = 0;
+        for (let i=0; i<ids.length; i++) {
+          const id = ids[i];
+          const tile = state.tiles.get(id);
+          if (!tile) continue;
+          if (i + 1 < ids.length) {
+            const nextId = ids[i + 1];
+            const nextTile = state.tiles.get(nextId);
+            if (nextTile && nextTile.value === tile.value) {
+              const [nr, nc] = targetCoordFor(dir, line, target);
+              tile.row = nr; tile.col = nc; nextTile.row = nr; nextTile.col = nc;
+              tile.value *= 2; tile.bump = true; nextTile.remove = true; nextTile.mergedInto = id;
+              newGrid[nr][nc] = id; gained += tile.value; state.unlocked.add(tile.value);
+              mergedEvents.push({ row:nr, col:nc, value:tile.value, key:getMonsterByValue(tile.value).key });
+              changed = true; target++; i++; continue;
+            }
+          }
+          const [nr, nc] = targetCoordFor(dir, line, target);
+          if (tile.row !== nr || tile.col !== nc) changed = true;
+          tile.row = nr; tile.col = nc; newGrid[nr][nc] = id; target++;
+        }
+      }
+
+      if (!changed) return;
+
+      history.push(snapshot);
+      state.grid = newGrid;
+      state.score += gained;
+      if (state.score > state.bestScore) state.bestScore = state.score;
+      addRandomTileObject(state);
+      unlockSeenBasics(state);
+      updateHighest(state);
+      savePersist();
+      updateStats();
+      renderTiles(false);
+      animating = true;
+
+      for (const evt of mergedEvents) emitMergeParticles(evt.row, evt.col, evt.value, evt.key);
+
+      setTimeout(() => {
+        cleanupRemovedTiles();
+        renderBestiary();
+        animating = false;
+        if (!boardWon && state.highest >= 2097152) {
+          boardWon = true;
+          showOverlay("神话终局已现身", "你成功合成出了提亚马特。龙后的五首咆哮撕开了地牢尽头的黑暗。你仍然可以继续挑战更高分。");
+        } else if (!canMove(boardValuesFromState(state))) {
+          boardLocked = true;
+          showOverlay("冒险结束", "石板已被魔力填满，新的融合无处发生。你可以回退、继续查看图鉴，或重新开局。");
+        }
+      }, MOVE_DURATION + 40);
+    }
+
+    function undo(){ if (!history.length || animating) return; const prev = history.pop(); restoreFromSerialized(prev); hideOverlay(); }
+    function canMove(board){
+      for (let r=0;r<SIZE;r++) for (let c=0;c<SIZE;c++) {
+        const v = board[r][c];
+        if (v === 0) return true;
+        if (c+1<SIZE && board[r][c+1]===v) return true;
+        if (r+1<SIZE && board[r+1][c]===v) return true;
+      }
+      return false;
+    }
+
+    function showOverlay(title, text){ overlayTitleEl.textContent = title; overlayTextEl.textContent = text; overlayEl.classList.add("show"); }
+    function hideOverlay(){ overlayEl.classList.remove("show"); }
+
+    function newGame(keepUnlocked=true){
+      const saved = loadPersist();
+      const board = emptyValueBoard();
+      addRandomValue(board); addRandomValue(board);
+      state = buildStateFromBoard(board, 0, saved.bestScore || 0, keepUnlocked ? (saved.unlocked || [2]) : [2]);
+      history = []; boardLocked = false; boardWon = false; animating = false;
+      clearTileDOM(); renderAll(true); savePersist(); hideOverlay();
+    }
+
+    function handleKey(e){
+      const key = e.key.toLowerCase();
+      if (["arrowup","w"].includes(key)) { e.preventDefault(); move("up"); }
+      else if (["arrowdown","s"].includes(key)) { e.preventDefault(); move("down"); }
+      else if (["arrowleft","a"].includes(key)) { e.preventDefault(); move("left"); }
+      else if (["arrowright","d"].includes(key)) { e.preventDefault(); move("right"); }
+      else if (key === "z") { e.preventDefault(); undo(); }
+    }
+
+    let touchStartX = 0, touchStartY = 0;
+    function handleTouchStart(e){ const t = e.changedTouches[0]; touchStartX = t.clientX; touchStartY = t.clientY; }
+    function handleTouchEnd(e){
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStartX, dy = t.clientY - touchStartY;
+      const ax = Math.abs(dx), ay = Math.abs(dy);
+      if (Math.max(ax, ay) < 26) return;
+      if (ax > ay) move(dx > 0 ? "right" : "left");
+      else move(dy > 0 ? "down" : "up");
+    }
+
+    function onResize(){ resizeParticleCanvas(); renderTiles(true); }
+
+    function paletteForParticles(key){
+      const map = {
+        rat:["rgba(199,167,120,1)","rgba(234,211,176,1)"], kobold:["rgba(237,132,92,1)","rgba(255,212,140,1)"], goblin:["rgba(121,217,101,1)","rgba(207,255,175,1)"],
+        icebat:["rgba(150,220,255,1)","rgba(232,249,255,1)"], ghoul:["rgba(165,183,145,1)","rgba(221,228,203,1)"], ogre:["rgba(210,160,92,1)","rgba(255,219,160,1)"],
+        displacer:["rgba(157,121,255,1)","rgba(227,213,255,1)"], flameskull:["rgba(255,118,79,1)","rgba(255,229,156,1)"], elemental:["rgba(255,131,53,1)","rgba(255,242,162,1)"],
+        medusa:["rgba(109,219,113,1)","rgba(217,255,185,1)"], mindflayer:["rgba(177,131,255,1)","rgba(238,226,255,1)"], hydra:["rgba(107,216,109,1)","rgba(227,255,205,1)"],
+        cloudgiant:["rgba(180,218,255,1)","rgba(255,255,255,1)"], aboleth:["rgba(75,230,205,1)","rgba(206,255,247,1)"], basilisk:["rgba(181,240,93,1)","rgba(246,255,191,1)"],
+        vampire:["rgba(255,98,132,1)","rgba(255,219,228,1)"], beholder:["rgba(182,128,255,1)","rgba(246,233,255,1)"], silverdragon:["rgba(203,227,255,1)","rgba(255,255,255,1)"],
+        lich:["rgba(97,255,188,1)","rgba(216,255,242,1)"], tarrasque:["rgba(255,137,92,1)","rgba(255,221,154,1)"], tiamat:["rgba(255,187,72,1)","rgba(255,248,192,1)"]
+      };
+      return map[key] || ["rgba(255,219,154,1)","rgba(255,247,220,1)"];
+    }
+
+    function emitMergeParticles(row, col, value, key){
+      const { x, y } = positionFor(row, col);
+      const cell = (boardEl.clientWidth - GAP * 4) / 5;
+      const cx = x + cell / 2, cy = y + cell / 2;
+      const [c1, c2] = paletteForParticles(key);
+      const power = Math.min(42, 12 + Math.log2(value) * 1.6);
+      for (let i=0;i<power;i++) {
+        const a = Math.random() * Math.PI * 2;
+        const speed = 0.8 + Math.random() * (1.3 + Math.log2(value) * 0.06);
+        particles.push({ x:cx, y:cy, vx:Math.cos(a)*speed, vy:Math.sin(a)*speed, life:28+Math.random()*24, age:0, size:1.8+Math.random()*(2+Math.log2(value)*0.08), color:Math.random()<0.65 ? c1 : c2, type:"spark" });
+      }
+      particles.push({ x:cx, y:cy, age:0, life:24, size:10+Math.log2(value)*1.4, color:c1, type:"ring" });
+      particles.push({ x:cx, y:cy, age:0, life:18, size:16+Math.log2(value)*1.2, color:c2, type:"glow" });
+      if (!particleRAF) particleRAF = requestAnimationFrame(tickParticles);
+    }
+
+    function tickParticles(){
+      pctx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+      for (let i=particles.length-1;i>=0;i--) {
+        const p = particles[i];
+        p.age += 1;
+        const t = p.age / p.life;
+        if (t >= 1) { particles.splice(i,1); continue; }
+        if (p.type === "spark") {
+          p.x += p.vx; p.y += p.vy; p.vx *= 0.985; p.vy *= 0.985;
+          const alpha = 1 - t;
+          pctx.fillStyle = p.color.replace(",1)", `,${alpha})`);
+          pctx.beginPath(); pctx.arc(p.x, p.y, p.size * (1 - t * 0.35), 0, Math.PI * 2); pctx.fill();
+        } else if (p.type === "ring") {
+          const alpha = 0.6 * (1 - t);
+          pctx.strokeStyle = p.color.replace(",1)", `,${alpha})`);
+          pctx.lineWidth = 2.2;
+          pctx.beginPath(); pctx.arc(p.x, p.y, p.size + t * 18, 0, Math.PI * 2); pctx.stroke();
+        } else if (p.type === "glow") {
+          const radius = p.size + t * 28;
+          const grd = pctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, radius);
+          grd.addColorStop(0, p.color.replace(",1)", `,${0.22 * (1 - t)})`));
+          grd.addColorStop(1, p.color.replace(",1)", ",0)"));
+          pctx.fillStyle = grd;
+          pctx.beginPath(); pctx.arc(p.x, p.y, radius, 0, Math.PI * 2); pctx.fill();
+        }
+      }
+      if (particles.length) particleRAF = requestAnimationFrame(tickParticles);
+      else { particleRAF = 0; pctx.clearRect(0,0,particleCanvas.width,particleCanvas.height); }
+    }
+
+    function drawMonster(canvas, key, locked=false){
+      const ctx = canvas.getContext("2d");
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0,0,W,H);
+      ctx.imageSmoothingEnabled = false;
+
+      const scale = Math.floor(Math.min(W, H) / 24);
+      const drawW = 24 * scale, drawH = 24 * scale;
+      const ox = Math.floor((W - drawW) / 2);
+      const oy = Math.floor((H - drawH) / 2);
+      const palette = getPalette(key, locked);
+
+      const fill = (x,y,w,h,color,outline=true) => {
+        if (outline) {
+          ctx.fillStyle = palette.outline;
+          ctx.fillRect(ox + (x - 1) * scale, oy + (y - 1) * scale, (w + 2) * scale, (h + 2) * scale);
+        }
+        ctx.fillStyle = color;
+        ctx.fillRect(ox + x * scale, oy + y * scale, w * scale, h * scale);
+      };
+      const dot = (x,y,color,outline=true) => fill(x,y,1,1,color,outline);
+      const line = (x1,y1,x2,y2,color) => {
+        const dx = Math.sign(x2 - x1), dy = Math.sign(y2 - y1);
+        let x = x1, y = y1;
+        while (true) {
+          dot(x,y,color,false);
+          if (x === x2 && y === y2) break;
+          if (x !== x2) x += dx;
+          if (y !== y2) y += dy;
+        }
+      };
+      const glow = (cx,cy,r,rgbaTemplate,alpha) => {
+        const grd = ctx.createRadialGradient(ox + cx * scale, oy + cy * scale, 0, ox + cx * scale, oy + cy * scale, r * scale);
+        grd.addColorStop(0, rgbaTemplate.replace("ALPHA", alpha));
+        grd.addColorStop(1, rgbaTemplate.replace("ALPHA", "0"));
+        ctx.fillStyle = grd;
+        ctx.beginPath();
+        ctx.arc(ox + cx * scale, oy + cy * scale, r * scale, 0, Math.PI * 2);
+        ctx.fill();
+      };
+      const shade = (x,y,w,h,color) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(ox + x * scale, oy + y * scale, w * scale, h * scale);
+      };
+
+      ctx.fillStyle = locked ? "rgba(0,0,0,.28)" : "rgba(0,0,0,.24)";
+      ctx.beginPath();
+      ctx.ellipse(W / 2, oy + 21 * scale, 7.1 * scale, 2.6 * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      switch (key) {
+        case "rat":
+          fill(3,11,11,6,palette.main); fill(11,8,6,5,palette.main); fill(14,9,2,2,palette.snout); fill(4,13,2,2,palette.mid); fill(2,14,2,1,palette.mid);
+          fill(12,6,1,2,palette.light); fill(14,6,1,2,palette.light); fill(15,12,3,1,palette.tail); fill(18,13,2,1,palette.tail); fill(20,14,1,1,palette.tail,false);
+          shade(5,15,5,1,palette.shadow); shade(11,11,4,1,palette.highlight); line(7,10,4,9,palette.whisker); line(16,10,19,9,palette.whisker); dot(12,10,palette.eye,false); dot(14,10,palette.eye,false); break;
+        case "kobold":
+          fill(7,7,8,9,palette.main); fill(9,3,5,5,palette.main); fill(8,2,1,2,palette.horn); fill(14,2,1,2,palette.horn); fill(9,8,4,2,palette.belly); fill(6,11,1,4,palette.arm); fill(15,11,1,4,palette.arm);
+          fill(9,16,1,4,palette.leg); fill(13,16,1,4,palette.leg); fill(15,9,4,1,palette.spear); fill(18,6,1,10,palette.spear); fill(10,5,1,1,palette.highlight,false); fill(12,5,1,1,palette.highlight,false); dot(10,5,palette.eye,false); dot(12,5,palette.eye,false); break;
+        case "goblin":
+          fill(6,7,9,10,palette.main); fill(8,3,6,5,palette.main); fill(5,5,2,2,palette.ear); fill(14,5,2,2,palette.ear); fill(8,8,5,3,palette.tunic); fill(5,11,1,4,palette.arm); fill(15,11,1,4,palette.arm);
+          fill(8,17,1,3,palette.leg); fill(12,17,1,3,palette.leg); fill(15,10,3,1,palette.blade); fill(17,7,1,5,palette.blade); shade(8,13,4,1,palette.shadow); dot(10,5,palette.eye,false); dot(12,5,palette.eye,false); dot(11,6,palette.teeth,false); break;
+        case "icebat":
+          glow(12,10,8,"rgba(170,220,255,ALPHA)","0.14");
+          fill(9,8,6,7,palette.main); fill(4,6,5,4,palette.wing); fill(15,6,5,4,palette.wing); fill(2,9,6,3,palette.wing2); fill(16,9,6,3,palette.wing2); fill(10,6,1,2,palette.horn); fill(13,6,1,2,palette.horn);
+          fill(10,15,1,3,palette.leg); fill(13,15,1,3,palette.leg); line(4,9,7,7,palette.vein); line(20,9,17,7,palette.vein); line(4,11,7,10,palette.vein); line(20,11,17,10,palette.vein); dot(10,10,palette.eye,false); dot(13,10,palette.eye,false); break;
+        case "ghoul":
+          fill(7,7,8,10,palette.main); fill(8,3,6,5,palette.skin); fill(6,11,1,5,palette.claw); fill(15,11,1,5,palette.claw); fill(8,17,1,3,palette.leg); fill(13,17,1,3,palette.leg);
+          fill(9,11,4,2,palette.rib); shade(8,8,6,1,palette.torn); line(10,12,10,14,palette.rib2); line(12,12,12,14,palette.rib2); dot(10,5,palette.eye,false); dot(12,5,palette.eye,false); dot(11,6,palette.eye2,false); break;
+        case "ogre":
+          fill(5,7,12,10,palette.main); fill(7,2,8,6,palette.skin); fill(3,10,2,5,palette.arm); fill(17,10,2,5,palette.arm); fill(8,17,2,4,palette.leg); fill(13,17,2,4,palette.leg);
+          fill(17,9,4,2,palette.club); fill(20,6,1,10,palette.club); fill(8,1,1,2,palette.horn); fill(14,1,1,2,palette.horn); fill(9,8,5,2,palette.belly); shade(8,13,7,1,palette.shadow); dot(9,5,palette.eye,false); dot(13,5,palette.eye,false); break;
+        case "displacer":
+          glow(12,10,9,"rgba(170,120,255,ALPHA)","0.12");
+          fill(6,8,10,7,palette.main); fill(9,4,6,5,palette.head); fill(5,10,2,3,palette.leg); fill(16,10,2,3,palette.leg); fill(8,15,2,4,palette.leg); fill(13,15,2,4,palette.leg);
+          fill(16,7,5,1,palette.tentacle); fill(18,5,1,5,palette.tentacle); fill(3,8,4,1,palette.tail); fill(8,10,6,2,palette.spots); line(18,7,21,4,palette.tentacle2); dot(10,7,palette.eye,false); dot(13,7,palette.eye,false); break;
+        case "flameskull":
+          glow(12,9,9,"rgba(255,120,90,ALPHA)","0.24");
+          fill(7,7,10,8,palette.bone); fill(10,15,4,2,palette.bone); fill(6,10,2,2,palette.flame); fill(16,10,2,2,palette.flame); fill(8,3,8,4,palette.flame2); fill(10,1,5,3,palette.flame3);
+          line(10,3,8,0,palette.flame4); line(14,3,17,0,palette.flame4); line(8,5,6,2,palette.flame); line(15,5,18,2,palette.flame); dot(10,9,palette.eye,false); dot(13,9,palette.eye,false); dot(11,12,palette.crack,false); dot(12,13,palette.crack,false); break;
+        case "elemental":
+          glow(12,10,10,"rgba(255,140,80,ALPHA)","0.26");
+          fill(7,7,10,10,palette.main); fill(5,11,2,4,palette.flame); fill(17,11,2,4,palette.flame); fill(8,3,8,4,palette.flame2); fill(10,1,5,3,palette.flame3);
+          fill(9,17,1,3,palette.leg); fill(14,17,1,3,palette.leg); line(8,5,5,2,palette.flame4); line(16,5,19,2,palette.flame4); line(9,13,7,16,palette.spark); line(15,13,17,16,palette.spark); dot(10,9,palette.eye,false); dot(13,9,palette.eye,false); break;
+        case "medusa":
+          glow(12,9,9,"rgba(120,255,150,ALPHA)","0.12");
+          fill(7,7,10,8,palette.skin); fill(8,3,8,5,palette.skin); fill(5,2,2,2,palette.snake); fill(7,1,2,2,palette.snake); fill(10,0,2,2,palette.snake); fill(13,1,2,2,palette.snake); fill(16,2,2,2,palette.snake);
+          fill(9,15,1,5,palette.tail); fill(10,16,4,5,palette.tail); fill(9,9,6,2,palette.gild); line(6,3,4,1,palette.snake2); line(16,3,18,1,palette.snake2); dot(10,6,palette.eye,false); dot(13,6,palette.eye,false); break;
+        case "mindflayer":
+          glow(12,8,9,"rgba(178,130,255,ALPHA)","0.16");
+          fill(7,5,10,9,palette.main); fill(8,1,8,5,palette.head); fill(7,14,1,5,palette.tentacle); fill(10,14,1,6,palette.tentacle); fill(13,14,1,6,palette.tentacle); fill(16,14,1,5,palette.tentacle);
+          fill(8,15,8,1,palette.tentacle2); fill(9,8,6,2,palette.sigil); line(10,16,8,19,palette.tentacle2); line(14,16,16,19,palette.tentacle2); dot(10,5,palette.eye,false); dot(13,5,palette.eye,false); break;
+        case "hydra":
+          glow(12,10,10,"rgba(124,255,142,ALPHA)","0.14");
+          fill(8,11,8,7,palette.body); fill(6,6,2,5,palette.neck); fill(9,5,2,6,palette.neck); fill(12,5,2,6,palette.neck); fill(15,6,2,5,palette.neck);
+          fill(5,3,4,4,palette.head); fill(8,2,4,4,palette.head); fill(11,2,4,4,palette.head); fill(14,3,4,4,palette.head); fill(9,18,2,3,palette.leg); fill(13,18,2,3,palette.leg);
+          line(6,4,4,2,palette.crest); line(16,4,18,2,palette.crest); dot(6,5,palette.eye,false); dot(9,4,palette.eye,false); dot(13,4,palette.eye,false); dot(16,5,palette.eye,false); break;
+        case "cloudgiant":
+          glow(12,7,10,"rgba(180,220,255,ALPHA)","0.16");
+          fill(6,6,12,12,palette.robe); fill(9,1,7,6,palette.skin); fill(4,9,2,6,palette.arm); fill(18,9,2,6,palette.arm); fill(10,18,2,4,palette.leg); fill(14,18,2,4,palette.leg);
+          fill(18,6,2,10,palette.staff); fill(20,4,1,13,palette.staff2); fill(7,12,10,1,palette.trim); fill(10,3,4,1,palette.beard); dot(10,4,palette.eye,false); dot(13,4,palette.eye,false); break;
+        case "aboleth":
+          glow(12,10,11,"rgba(110,255,210,ALPHA)","0.14");
+          fill(5,8,13,8,palette.body); fill(8,4,9,5,palette.head); fill(4,10,1,8,palette.tentacle); fill(7,12,1,8,palette.tentacle); fill(17,12,1,8,palette.tentacle); fill(20,10,1,8,palette.tentacle);
+          fill(18,11,3,1,palette.tail); fill(20,12,2,1,palette.tail); fill(8,12,8,1,palette.slime); line(6,13,8,17,palette.tentacle2); line(18,13,16,17,palette.tentacle2); dot(10,7,palette.eye,false); dot(14,7,palette.eye,false); break;
+        case "basilisk":
+          glow(12,9,9,"rgba(180,255,120,ALPHA)","0.12");
+          fill(5,11,12,5,palette.body); fill(11,6,7,6,palette.head); fill(15,5,2,1,palette.horn); fill(17,10,4,1,palette.tail); fill(20,11,2,1,palette.tail); fill(8,15,2,4,palette.leg); fill(12,15,2,4,palette.leg);
+          fill(8,10,3,1,palette.scale); fill(12,9,4,1,palette.scale2); line(18,11,21,13,palette.tail2); dot(13,8,palette.eye,false); break;
+        case "vampire":
+          glow(12,7,9,"rgba(255,80,110,ALPHA)","0.12");
+          fill(8,3,8,6,palette.skin); fill(7,9,10,8,palette.coat); fill(4,7,3,8,palette.cape); fill(17,7,3,8,palette.cape); fill(10,17,1,4,palette.leg); fill(14,17,1,4,palette.leg);
+          fill(10,8,4,2,palette.medal); fill(7,12,10,1,palette.trim); shade(9,4,5,1,palette.hair); dot(10,5,palette.eye,false); dot(13,5,palette.eye,false); dot(11,6,palette.fang,false); dot(12,6,palette.fang,false); break;
+        case "beholder":
+          glow(12,9,11,"rgba(178,120,255,ALPHA)","0.20");
+          fill(6,6,12,11,palette.body); fill(10,10,5,5,palette.eyeWhite); fill(11,11,3,3,palette.eye); fill(5,4,1,5,palette.stalk); fill(2,3,4,1,palette.stalkEnd); fill(18,4,1,5,palette.stalk); fill(19,3,4,1,palette.stalkEnd);
+          fill(4,11,2,1,palette.stalkEnd); fill(18,11,2,1,palette.stalkEnd); fill(9,2,1,4,palette.stalk); fill(15,2,1,4,palette.stalk); line(11,15,13,16,palette.mouth); dot(2,3,palette.eye2,false); dot(22,3,palette.eye2,false); dot(4,11,palette.eye2,false); dot(19,11,palette.eye2,false); break;
+        case "silverdragon":
+          glow(12,8,11,"rgba(200,235,255,ALPHA)","0.22");
+          fill(7,7,9,8,palette.body); fill(10,2,6,6,palette.head); fill(5,7,2,7,palette.wing); fill(16,7,2,7,palette.wing); fill(2,6,3,5,palette.wing2); fill(18,6,3,5,palette.wing2);
+          fill(8,15,2,5,palette.leg); fill(13,15,2,5,palette.leg); fill(16,12,4,1,palette.tail); fill(19,13,2,1,palette.tail); fill(12,1,1,2,palette.horn); fill(15,1,1,2,palette.horn);
+          fill(9,10,5,1,palette.scale); fill(8,12,6,1,palette.scale2); dot(12,5,palette.eye,false); break;
+        case "lich":
+          glow(12,7,10,"rgba(124,255,195,ALPHA)","0.18");
+          fill(8,4,8,5,palette.skull); fill(6,9,12,10,palette.robe); fill(4,10,2,6,palette.arm); fill(18,10,2,6,palette.arm); fill(19,6,1,10,palette.staff); fill(20,4,2,2,palette.orb); fill(9,19,1,3,palette.shred); fill(14,19,1,3,palette.shred);
+          fill(8,12,8,1,palette.trim); line(20,5,22,3,palette.orb2); dot(10,5,palette.eye,false); dot(13,5,palette.eye,false); break;
+        case "tarrasque":
+          glow(12,10,12,"rgba(255,110,75,ALPHA)","0.14");
+          fill(5,7,13,10,palette.body); fill(10,2,8,6,palette.head); fill(3,10,2,5,palette.arm); fill(18,10,2,5,palette.arm); fill(8,17,2,4,palette.leg); fill(14,17,2,4,palette.leg);
+          fill(6,5,1,2,palette.spike); fill(8,4,1,2,palette.spike); fill(11,3,1,2,palette.spike); fill(14,4,1,2,palette.spike); fill(17,5,1,2,palette.spike); fill(18,12,4,1,palette.tail); fill(21,13,1,2,palette.tail);
+          fill(8,12,9,1,palette.plates); fill(9,14,7,1,palette.plates2); dot(14,5,palette.eye,false); break;
+        case "tiamat":
+          glow(12,8,13,"rgba(255,186,79,ALPHA)","0.22");
+          fill(7,10,10,8,palette.body); fill(4,6,4,4,palette.headRed); fill(8,3,4,4,palette.headBlue); fill(12,1,4,5,palette.headBlack); fill(16,3,4,4,palette.headGreen); fill(20,6,3,4,palette.headWhite);
+          fill(2,8,4,7,palette.wing); fill(18,8,4,7,palette.wing); fill(9,18,2,3,palette.leg); fill(14,18,2,3,palette.leg); fill(16,15,5,1,palette.tail); fill(8,12,8,1,palette.scale);
+          line(5,8,3,5,palette.wing2); line(19,8,21,5,palette.wing2); dot(5,8,palette.eye,false); dot(9,5,palette.eye,false); dot(13,4,palette.eye,false); dot(17,5,palette.eye,false); dot(21,8,palette.eye,false); break;
+      }
+
+      if (!locked) {
+        shade(7,2,7,1,"rgba(255,255,255,.10)");
+        dot(18,17,"rgba(255,255,255,.12)",false);
+      }
+    }
+
+    function getPalette(key, locked){
+      if (locked) {
+        return {
+          outline:"#0c1017", main:"#4b5060", mid:"#3c4250", light:"#666c7b", eye:"#8a8fa1", eye2:"#7b8594", tail:"#575c6b", horn:"#707788", spear:"#646b7b", blade:"#666f80", wing:"#454b5a", wing2:"#555d6f",
+          skin:"#575d6d", claw:"#737b8a", rib:"#676d7d", rib2:"#757d8d", arm:"#4f5667", leg:"#545b6b", club:"#5f6676", head:"#585e6e", tentacle:"#596071", tentacle2:"#6a7281", flame:"#6b6f79", flame2:"#808695", flame3:"#9ba1b0", flame4:"#afb5c2",
+          bone:"#8d95a5", snake:"#687080", snake2:"#7c8594", robe:"#52596a", body:"#555c6d", neck:"#62697a", staff:"#606775", staff2:"#777f8f", orb:"#9097a5", orb2:"#aab0bc", stalk:"#5d6474", stalkEnd:"#848b9b", eyeWhite:"#b8bfcb", coat:"#555b6b", cape:"#474d5c", medal:"#7f8796", skull:"#9aa1b0", shred:"#6f7787", spike:"#737b89", headRed:"#666b7c", headBlue:"#777f8f", headBlack:"#555b68", headGreen:"#707788", headWhite:"#a2aab8", scale:"#6e7585", scale2:"#7a8090", sigil:"#7f8794", whisker:"#7f8794", shadow:"#404654", belly:"#677080", tunic:"#686e7d", teeth:"#d0d5e1", vein:"#9ba4b3", torn:"#6a7282", spots:"#80879a", crack:"#6c7380", gild:"#8b949f", trim:"#8e95a2", slime:"#7d8998", fang:"#c4cada", plates:"#777f8c", plates2:"#8d95a3", mouth:"#a2a9b5", beard:"#969ead", snout:"#707988", crest:"#8c94a3", spark:"#c0c8d3", tail2:"#868d9a", highlight:"#7e8694"
+        };
+      }
+      const common = { outline:"#16140f", eye:"#fff2a6", eye2:"#ffe0c0", shadow:"#473725", whisker:"#d7cbb9", teeth:"#efe4c3", fang:"#f0dfdd", highlight:"#bcb19f" };
+      const map = {
+        rat:{ ...common, main:"#847059", mid:"#6a5844", light:"#a9967d", tail:"#c98b7b", snout:"#c5b39a" },
+        kobold:{ ...common, main:"#a05c46", arm:"#874a37", leg:"#7d4332", horn:"#d4be7e", spear:"#c3c8d3", belly:"#cf9a66" },
+        goblin:{ ...common, main:"#5f9a49", ear:"#8bc46b", blade:"#d8dbdf", tunic:"#7a5d34", mid:"#467638" },
+        icebat:{ ...common, main:"#7fc2ff", wing:"#5d8ec8", wing2:"#4e78ad", horn:"#d9f4ff", leg:"#8dc6ff", vein:"#c9f4ff" },
+        ghoul:{ ...common, main:"#5a6c5d", skin:"#8b8d79", claw:"#bfc4ad", leg:"#616b5d", rib:"#959d8d", rib2:"#a7b0a0", torn:"#374139" },
+        ogre:{ ...common, main:"#8a6d44", skin:"#c5a36f", arm:"#7e613d", leg:"#684d31", club:"#9b7e57", horn:"#d7c7a4", belly:"#a6804c" },
+        displacer:{ ...common, main:"#1c1929", head:"#252033", leg:"#251f35", tentacle:"#7567d9", tentacle2:"#b8acff", tail:"#4e418b", spots:"#9183ee" },
+        flameskull:{ ...common, bone:"#ece7d2", flame:"#ff8b5e", flame2:"#ffb05f", flame3:"#fff0a0", flame4:"#fff6cf", crack:"#988b71" },
+        elemental:{ ...common, main:"#ff7f42", leg:"#ffb968", flame:"#ff6242", flame2:"#ff9d3c", flame3:"#ffe37f", flame4:"#fff1b7", spark:"#ffd9a6" },
+        medusa:{ ...common, skin:"#d6c39a", snake:"#4ea95b", snake2:"#86de7d", tail:"#7aaf48", gild:"#d8c15b" },
+        mindflayer:{ ...common, main:"#8d69bf", head:"#ccb7e4", tentacle:"#b58ee6", tentacle2:"#e3d6ff", sigil:"#f2dca8" },
+        hydra:{ ...common, body:"#4d8a46", neck:"#5a9f51", head:"#74bb63", leg:"#395f34", crest:"#b9f48d" },
+        cloudgiant:{ ...common, robe:"#8fa3d8", skin:"#d7c2a5", arm:"#b79c7a", leg:"#d5dfef", staff:"#8a6c49", staff2:"#dbbe82", trim:"#e7d59d", beard:"#eef4ff" },
+        aboleth:{ ...common, body:"#2e8f8a", head:"#74d4c4", tentacle:"#80d9ca", tentacle2:"#baf8ef", tail:"#a7efe2", slime:"#c4fff5" },
+        basilisk:{ ...common, body:"#7d9d37", head:"#a7c857", horn:"#e9d17d", tail:"#6d7b29", tail2:"#a9b868", leg:"#637326", scale:"#d6ea73", scale2:"#bfdc5e" },
+        vampire:{ ...common, skin:"#d9d1d8", coat:"#3d2034", cape:"#8f2138", medal:"#dfc06d", leg:"#261221", trim:"#d6bad1", hair:"#261b24" },
+        beholder:{ ...common, body:"#8a57a8", eyeWhite:"#f2f3ef", stalk:"#ab82c8", stalkEnd:"#c49be6", mouth:"#e6c8ff" },
+        silverdragon:{ ...common, body:"#ccd8e8", head:"#eef4fb", wing:"#a8bbd8", wing2:"#7f95b5", leg:"#bccce1", tail:"#96aaca", horn:"#f7f7ff", scale:"#edf5ff", scale2:"#d8e8ff" },
+        lich:{ ...common, skull:"#e9efeb", robe:"#2e304a", arm:"#b9d0c4", staff:"#7f6847", orb:"#5effb7", orb2:"#b9ffe0", shred:"#87a39c", trim:"#6be7bb" },
+        tarrasque:{ ...common, body:"#6b5a43", head:"#8a7253", arm:"#5a4936", leg:"#4e3d2f", spike:"#d4b170", tail:"#83684b", plates:"#a88a60", plates2:"#866e4c" },
+        tiamat:{ ...common, body:"#8c7b62", wing:"#735d49", wing2:"#b88f62", leg:"#5d4938", tail:"#aa8a62", headRed:"#d5463c", headBlue:"#4d73dc", headBlack:"#33353f", headGreen:"#3ca85d", headWhite:"#ece7dd", scale:"#f0d48b" }
+      };
+      return map[key];
+    }
+
+    document.getElementById("newGameBtn").addEventListener("click", () => newGame(true));
+    document.getElementById("undoBtn").addEventListener("click", undo);
+    document.getElementById("clearSaveBtn").addEventListener("click", () => { clearPersist(); newGame(false); });
+    document.getElementById("continueBtn").addEventListener("click", hideOverlay);
+    document.getElementById("restartBtn").addEventListener("click", () => newGame(true));
+    overlayEl.addEventListener("click", e => { if (e.target === overlayEl) hideOverlay(); });
+    window.addEventListener("keydown", handleKey, { passive:false });
+    boardEl.addEventListener("touchstart", handleTouchStart, { passive:true });
+    boardEl.addEventListener("touchend", handleTouchEnd, { passive:true });
+    window.addEventListener("resize", onResize);
+
+    renderBackgroundGrid();
+    state = createFreshState();
+    renderAll(true);
+  </script>
+</body>
+</html>
